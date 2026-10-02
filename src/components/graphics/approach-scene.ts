@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { blockMaterial } from "./block-material";
 import { blockDrop, type BlockSource } from "@/lib/block-drop";
+import { smallViewportHeight } from "@/lib/viewport";
 
 /**
  * Scena 3D della sezione "Our companies": quattro terrazze a quote crescenti,
@@ -16,6 +17,8 @@ import { blockDrop, type BlockSource } from "@/lib/block-drop";
 export type ApproachScene = {
   setState(s: number): void;
   setActive(on: boolean): void;
+  /** Spazio libero tra titolo e testo dei livelli, in px dall'alto della tela: usato solo su schermi stretti. */
+  setBand(top: number, bottom: number): void;
   dispose(): void;
 };
 
@@ -192,25 +195,35 @@ export async function createApproachScene(container: HTMLElement): Promise<Appro
   let baseDist = 22;
   let viewW = 1;
   let viewH = 1;
+  /** Altezza dell'inquadratura: lo schermo a barre aperte. La tela può essere più alta e prosegue sotto. */
+  let frameH = 1;
   const resize = () => {
     viewW = container.clientWidth || 1;
     viewH = container.clientHeight || 1;
+    frameH = Math.min(viewH, smallViewportHeight());
     renderer.setSize(viewW, viewH, false);
     mat.uniforms.uLine.value = 1.2 * renderer.getPixelRatio();
-    camera.aspect = viewW / viewH;
+    camera.aspect = viewW / frameH;
     camera.updateProjectionMatrix();
     baseDist = 22 * Math.max(1, 1.3 / camera.aspect);
   };
   /**
    * Inquadratura: nella vista d'insieme (k = 0) la scalinata è centrata, un po' sotto il titolo;
-   * sui livelli (k = 1) sta a destra su desktop e in alto su schermi stretti, per lasciare spazio al testo.
+   * sui livelli (k = 1) sta a destra su desktop e, su schermi stretti, al centro dello spazio tra titolo e testo.
    */
   const frame = (k: number) => {
     const desktop = viewW >= 1024;
     const x = desktop ? -viewW * 0.2 * k : 0;
-    const y = lerp(-viewH * 0.07, desktop ? 0 : viewH * 0.2, k);
-    camera.setViewOffset(viewW, viewH, x, y, viewW, viewH);
+    // Il centro della terrazza sta poco sopra il centro dello spazio libero: sopra ci sono gli edifici.
+    const level = band ? frameH / 2 - (band.top + band.bottom) / 2 + (band.bottom - band.top) * 0.07 : frameH * 0.09;
+    const y = desktop ? lerp(-frameH * 0.07, 0, k) : lerp(-frameH * 0.02, level, k);
+    camera.setViewOffset(viewW, frameH, x, y, viewW, viewH);
   };
+  /** Spazio tra titolo e testo dei livelli per cui è tarata la distanza (402×874): con meno spazio la camera si allontana. */
+  const BAND_REF = 325;
+  let band: { top: number; bottom: number } | null = null;
+  const levelFit = () =>
+    band && viewW < 1024 ? Math.min(1, Math.max(0.45, (band.bottom - band.top) / BAND_REF)) : 1;
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   resize();
@@ -322,13 +335,14 @@ export async function createApproachScene(container: HTMLElement): Promise<Appro
     if (s < 1) {
       const t = easeInOut(s);
       target.lerpVectors(overview, levelTarget(0), t);
-      dist = lerp(baseDist * 2.8, baseDist, t);
+      // Su schermi stretti la vista d'insieme si avvicina: la scalinata riempie la larghezza.
+      dist = lerp(baseDist * (viewW >= 1024 ? 2.8 : 2.45), baseDist / levelFit(), t);
     } else {
       const i = Math.min(Math.floor(s - 1), 2);
       const f = easeInOut(clamp01(s - 1 - i));
       target.lerpVectors(levelTarget(i), levelTarget(i + 1), f);
       // Durante la salita la camera si allontana un poco: si vede il cambio di livello.
-      dist = baseDist * (1 + 0.35 * Math.sin(f * Math.PI));
+      dist = (baseDist / levelFit()) * (1 + 0.35 * Math.sin(f * Math.PI));
     }
     const az = 0.42 + Math.sin(time * 0.2) * 0.03;
     camera.position.set(
@@ -409,6 +423,9 @@ export async function createApproachScene(container: HTMLElement): Promise<Appro
     },
     setActive(on: boolean) {
       active = on;
+    },
+    setBand(top: number, bottom: number) {
+      band = { top, bottom };
     },
     dispose() {
       if (blockDrop.source === source) blockDrop.source = null;

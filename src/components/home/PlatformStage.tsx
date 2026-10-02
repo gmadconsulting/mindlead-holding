@@ -391,10 +391,12 @@ export function PlatformStage() {
         tl.to(all("[data-pf-method] [data-pf-face]"), { backgroundColor: "#e6f1ff", duration: 16 }, FUSE + 12);
         tl.to(one("[data-pf-turn]"), { rotation: TURN - 300, duration: 62, ease: "power2.in" }, FUSE + 8);
         tl.to(one("[data-pf-world]"), { rotationX: 34, duration: 50, ease: "power2.inOut" }, FUSE + 8);
-        // Il centro del diagramma va al centro dello schermo: lo spostamento è nello spazio della camera, prima della scala.
+        // Il centro del diagramma va al centro della sfera (lo schermo a barre aperte): lo spostamento è nello spazio
+        // della camera, prima della scala.
         const f = fit.getBoundingClientRect();
-        const dx = (s.left + s.width / 2 - (f.left + f.width / 2)) / scale;
-        const dy = (s.top + s.height / 2 - (f.top + f.height / 2)) / scale;
+        const o = (one("[data-pf-orb]") ?? sticky).getBoundingClientRect();
+        const dx = (o.left + o.width / 2 - (f.left + f.width / 2)) / scale;
+        const dy = (o.top + o.height / 2 - (f.top + f.height / 2)) / scale;
         tl.to(cam, { x: dx, y: dy, duration: 44, ease: "power2.inOut" }, FUSE + 6);
         tl.to(cam, { scale: 0.22, duration: 46, ease: "power2.inOut" }, FUSE + 14);
         // Sulla camera, non su fit: l'opacità di fit la anima già la timeline esterna, e due timeline sulla stessa
@@ -422,14 +424,16 @@ export function PlatformStage() {
   const steps = platform.steps;
 
   return (
-    <section ref={stageRef} className="relative h-[870svh] bg-bg motion-reduce:h-auto">
+    // Più (100lvh − 100svh): il palco alto 100lvh resta fermo fino a quando "Intelligence" (sovrapposta di 100lvh) lo copre.
+    <section ref={stageRef} className="relative h-[calc(870svh+100lvh-100svh)] bg-bg motion-reduce:h-auto">
       <div
         data-pf-sticky
-        className="sticky top-0 h-svh overflow-hidden motion-reduce:relative motion-reduce:h-auto motion-reduce:min-h-svh"
+        className="sticky top-0 h-lvh overflow-hidden motion-reduce:relative motion-reduce:h-auto motion-reduce:min-h-svh"
       >
         <div data-pf-ink aria-hidden className="absolute inset-0 bg-ink-bg motion-reduce:hidden" />
 
-        <Container className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-y-4 pt-[calc(var(--header-h)+4svh)] pb-[7svh] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-10 motion-reduce:py-24">
+        {/* Il palco è alto 100lvh (il foglio scuro copre lo schermo anche a barre del browser chiuse), i testi restano in 100svh. */}
+        <Container className="grid h-svh grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-y-4 pt-[calc(var(--header-h)+4svh)] pb-[7svh] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-10 motion-reduce:h-full motion-reduce:py-24">
           <div data-pf-head className="lg:col-start-1 lg:row-start-1">
             <p data-pf-eyebrow className="font-mono text-[13px] text-ink-text motion-reduce:text-muted">
               05 — Platform
@@ -652,7 +656,7 @@ export function PlatformStage() {
         <div
           data-pf-orb
           aria-hidden
-          className="pointer-events-none invisible absolute inset-0 z-40 flex items-center justify-center opacity-0 motion-reduce:hidden"
+          className="pointer-events-none invisible absolute inset-x-0 top-0 z-40 flex h-svh items-center justify-center opacity-0 motion-reduce:hidden"
         >
           <AiOrb />
         </div>

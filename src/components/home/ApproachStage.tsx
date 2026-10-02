@@ -33,6 +33,7 @@ export function ApproachStage() {
     let disposed = false;
     let scene: ApproachScene | null = null;
     let sceneState = 0;
+    let band: [number, number] | null = null;
     let observer: IntersectionObserver | null = null;
 
     import("@/components/graphics/approach-scene").then(async ({ createApproachScene }) => {
@@ -44,6 +45,7 @@ export function ApproachStage() {
       }
       scene = created;
       created.setState(sceneState);
+      if (band) created.setBand(...band);
       observer = new IntersectionObserver(([entry]) => created.setActive(entry.isIntersecting));
       observer.observe(stage);
     });
@@ -65,6 +67,15 @@ export function ApproachStage() {
           meta: all(el, "[data-level-meta]"),
         }));
         const ticks = all(stage, "[data-level-tick]");
+
+        // Spazio libero tra titolo e testo dei livelli: su schermi stretti la terrazza si centra e si adatta lì.
+        const box = sceneBox.getBoundingClientRect();
+        const title = stage.querySelector("[data-approach-title]")?.getBoundingClientRect();
+        const text = stage.querySelector("[data-level]")?.parentElement?.getBoundingClientRect();
+        if (title && text) {
+          band = [title.bottom - box.top, text.top - box.top];
+          scene?.setBand(...band);
+        }
 
         // Le posizioni sono in svh di scroll: 0 = palco che entra dal fondo, STAGE = fine.
         const tl = gsap.timeline({
@@ -191,7 +202,7 @@ export function ApproachStage() {
     <section ref={stageRef} className="relative h-[520svh] bg-bg motion-reduce:h-auto">
       <div
         data-approach-sticky
-        className="sticky top-0 h-svh overflow-hidden motion-reduce:static motion-reduce:h-auto motion-reduce:overflow-visible"
+        className="sticky top-0 h-lvh overflow-hidden motion-reduce:static motion-reduce:h-auto motion-reduce:overflow-visible"
       >
         {/* La pozza: il tono della sezione si apre dal punto in cui cade la goccia e porta con sé la scena. */}
         <div
@@ -215,7 +226,8 @@ export function ApproachStage() {
             className="pointer-events-none absolute top-0 left-0 z-40 block rounded-full border border-ink/25 opacity-0 motion-reduce:hidden"
           />
         ))}
-        <Container className="relative flex h-full flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:py-24">
+        {/* Il palco è alto 100lvh (la pozza copre lo schermo anche a barre del browser chiuse), i testi restano in 100svh. */}
+        <Container className="relative flex h-svh flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:h-full motion-reduce:py-24">
           <p data-approach-eyebrow className="font-mono text-[13px] text-muted">
             04 — Our companies
           </p>
@@ -227,8 +239,8 @@ export function ApproachStage() {
             ))}
           </h2>
           <div className="mt-auto flex max-w-lg gap-6 motion-reduce:mt-16">
-            {/* Indicatore dei livelli: dal basso verso l'alto, come le terrazze. */}
-            <div data-level-ticks aria-hidden className="flex flex-col-reverse gap-2 pt-1.5 motion-reduce:hidden">
+            {/* Indicatore dei livelli: dal basso verso l'alto, come le terrazze. Su mobile basta "01 / 04" e il testo resta allineato al titolo. */}
+            <div data-level-ticks aria-hidden className="hidden flex-col-reverse gap-2 pt-1.5 lg:flex motion-reduce:hidden">
               {approach.levels.map((level) => (
                 <span key={level.company} data-level-tick className="block h-px w-5 origin-left bg-line-strong" />
               ))}
@@ -239,13 +251,13 @@ export function ApproachStage() {
                   <p data-level-meta className="font-mono text-[13px] text-muted">
                     0{index + 1} / 0{approach.levels.length} — {level.scale}
                   </p>
-                  <h3 data-level-title className="display mt-4 text-[clamp(30px,3.4vw,52px)] leading-none">
+                  <h3 data-level-title className="display mt-4 text-[clamp(30px,3.4vw,52px)] leading-none short:mt-3 short:text-[26px]">
                     {level.title}
                   </h3>
-                  <p data-level-meta className="mt-4 max-w-md text-[17px] text-muted">
+                  <p data-level-meta className="mt-4 max-w-md text-[17px] text-muted short:mt-2 short:text-[15px]">
                     {level.body}
                   </p>
-                  <Link data-level-meta href={level.href} className="mt-5 inline-block font-mono text-[13px]">
+                  <Link data-level-meta href={level.href} className="mt-5 inline-block font-mono text-[13px] short:mt-3">
                     {level.company} →
                   </Link>
                 </article>

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { blockMaterial } from "./block-material";
+import { smallViewportHeight } from "@/lib/viewport";
 
 /**
  * Scena 3D del capitolo "What we've learned". Gli stessi 56 moduli raccontano una storia sola:
@@ -24,6 +25,8 @@ export type ServicesScene = {
   /** La pallina dell'anello più vicina al fondo dello schermo, che cade come goccia (vedi engine-drop). */
   dropPoint(): { x: number; y: number } | null;
   releaseDot(on: boolean): void;
+  /** Spazio libero tra titolo e tappe del motore, in px dall'alto della tela: usato solo su schermi stretti. */
+  setBand(top: number, bottom: number): void;
   dispose(): void;
 };
 
@@ -609,25 +612,53 @@ export async function createServicesScene(container: HTMLElement): Promise<Servi
   const tmpS = new THREE.Vector3();
   const matrix = new THREE.Matrix4();
 
+  let viewW = 1;
+  let viewH = 1;
+  /** Altezza dell'inquadratura: lo schermo a barre aperte. La tela può essere più alta e prosegue sotto. */
+  let frameH = 1;
+  let narrow = false;
   const resize = () => {
     const w = container.clientWidth || 1;
     const h = container.clientHeight || 1;
+    viewW = w;
+    viewH = h;
+    frameH = Math.min(h, smallViewportHeight());
+    narrow = w < 1024;
     renderer.setSize(w, h, false);
     blockMat.uniforms.uLine.value = 1.2 * renderer.getPixelRatio();
-    camera.aspect = w / h;
+    camera.aspect = w / frameH;
     // La scena sta a destra su desktop, in alto su schermi stretti: il testo ha il suo spazio.
-    if (w >= 1024) camera.setViewOffset(w, h, -w * 0.2, 0, w, h);
-    else camera.setViewOffset(w, h, 0, h * 0.2, w, h);
+    if (w >= 1024) camera.setViewOffset(w, frameH, -w * 0.2, 0, w, h);
+    else camera.setViewOffset(w, frameH, 0, frameH * 0.2, w, h);
     camera.updateProjectionMatrix();
     baseDist = 26 * Math.max(1, 1.3 / camera.aspect);
   };
   let baseDist = 26;
   const ELEV = THREE.MathUtils.degToRad(26);
+  /** Su schermi stretti, distanza dalla stazione in primo piano nel motore e inclinazione più bassa. */
+  const NARROW_DIST = 32;
+  const NARROW_ELEV = THREE.MathUtils.degToRad(15);
+  /** Spazio tra titolo e tappe per cui è tarata NARROW_DIST (402×874): con meno spazio la camera si allontana. */
+  const BAND_REF = 257;
+  let band: { top: number; bottom: number } | null = null;
   const placeCamera = (zoom: number) => {
     // Nello zoom indietro la camera si allontana e guarda più in basso, verso il centro dell'anello.
-    const dist = baseDist * (1 + 0.6 * zoom);
+    let dist = baseDist * (1 + 0.6 * zoom);
+    let elev = ELEV;
     lookAt.y = 1.9 - 1.1 * zoom;
-    camera.position.set(0, lookAt.y + Math.sin(ELEV) * dist, Math.cos(ELEV) * dist);
+    lookAt.z = 0;
+    if (narrow) {
+      // Su schermi stretti l'anello intero sarebbe minuscolo: la camera va sulla stazione davanti,
+      // che resta grande al centro dello spazio tra titolo e tappe; l'anello, più schiacciato, esce dai lati.
+      const fit = band ? Math.min(1, Math.max(0.45, (band.bottom - band.top) / BAND_REF)) : 1;
+      const offset = band ? frameH / 2 - (band.top + band.bottom) / 2 : frameH * 0.1;
+      dist = baseDist + (NARROW_DIST / fit - baseDist) * zoom;
+      elev = ELEV + (NARROW_ELEV - ELEV) * zoom;
+      lookAt.z = RING_R * zoom;
+      camera.setViewOffset(viewW, frameH, 0, frameH * 0.2 + (offset - frameH * 0.2) * zoom, viewW, viewH);
+      camera.updateProjectionMatrix();
+    }
+    camera.position.set(0, lookAt.y + Math.sin(elev) * dist, lookAt.z + Math.cos(elev) * dist);
     camera.lookAt(lookAt);
   };
   const observer = new ResizeObserver(resize);
@@ -817,6 +848,9 @@ export async function createServicesScene(container: HTMLElement): Promise<Servi
     releaseDot(on: boolean) {
       if (on && released < 0) released = lowestPulse();
       if (!on) released = -1;
+    },
+    setBand(top: number, bottom: number) {
+      band = { top, bottom };
     },
     dispose() {
       cancelAnimationFrame(raf);

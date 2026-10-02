@@ -146,8 +146,8 @@ export const nextCompany = {
 } as const;
 
 export const hero = {
-  title: ["We build software", "companies."],
-  body: "Mindlead Group brings together technology advisory, bespoke software, and vertical products for specific industries. One platform, several focused companies, one aim: help businesses grow with the right software.",
+  title: ["The infrastructure", "companies run\u00a0on."],
+  body: "Mindlead Group brings together technology advisory, bespoke software, and vertical products for specific industries. One core technology, several focused companies, one aim: help businesses grow with the right software.",
   primary: "See our companies",
   secondary: "Build with us",
   places: ["Milan", "Dubai"],

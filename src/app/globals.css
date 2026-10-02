@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "lenis/dist/lenis.css";
 
+/* Telefoni bassi (es. iPhone SE): testi più compatti, alle scene 3D resta spazio tra titolo e testo. */
+@custom-variant short (@media (max-width: 1023.98px) and (max-height: 760px));
+
 :root {
   --bg: #fafaf9;
   --bg-elevated: #ffffff;

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { smallViewportHeight } from "@/lib/viewport";
 
 /**
  * Scena three.js dell'hero: Mindlead Holding al centro, le controllate intorno.
@@ -426,17 +427,51 @@ export async function createCircuitScene(container: HTMLElement): Promise<Circui
     return out;
   };
 
-  // Camera: distanza adatta allo schermo, poi tuffo nel chip.
+  // Ingombro della scena costruita: spigoli di moduli, zoccolo "next" e componenti piccoli.
+  const bounds: THREE.Vector3[] = [];
+  const corners = (x: number, z: number, w: number, d: number, h: number) => {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, h]) {
+      bounds.push(new THREE.Vector3(x + (sx * w) / 2, y, z + (sz * d) / 2));
+    }
+  };
+  MODULES.forEach((m) => corners(m.x, m.z, m.w, m.d, m.h + 0.6));
+  corners(NEXT.x, NEXT.z, NEXT.w, NEXT.d, 0);
+  SMALL_PARTS.forEach((s) => corners(s.x, s.z, 1.0, 0.8, 0.8));
+  const projected = new THREE.Vector3();
+  // In alto c'è l'header: lì il margine è più ampio.
+  const fits = () =>
+    bounds.every((point) => {
+      projected.copy(point).project(camera);
+      return Math.abs(projected.x) < 0.92 && projected.y > -0.9 && projected.y < 0.82;
+    });
+
+  // Camera: distanza a cui tutta la scena sta nello schermo, poi tuffo nel chip.
   let width = 1;
   let height = 1;
   let baseDistance = 30;
   const resize = () => {
     width = container.clientWidth || 1;
     height = container.clientHeight || 1;
+    // Inquadratura sullo schermo a barre aperte: la tela può essere più alta e prosegue sotto.
+    const frameH = Math.min(height, smallViewportHeight());
     renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    camera.aspect = width / frameH;
+    camera.clearViewOffset();
+    // Stessa posa di fine avvicinamento in update (elevazione 56°, giro -22°, centro spostato di 1.6).
+    const z = target.z;
+    target.z = 1.6;
     baseDistance = Math.min(54 / camera.aspect, 72);
+    for (let i = 0; i < 60; i++) {
+      placeCamera(baseDistance, 56, -22);
+      camera.updateMatrixWorld();
+      if (fits()) break;
+      baseDistance *= 1.03;
+    }
+    target.z = z;
+    if (height > frameH) {
+      camera.setViewOffset(width, frameH, 0, 0, width, height);
+      camera.updateProjectionMatrix();
+    }
     needsRender = true;
   };
 

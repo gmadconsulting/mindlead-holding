@@ -6,6 +6,7 @@ import { intelligence } from "@/content/it";
 import { Container } from "@/components/layout/Container";
 import { gsap, registerGsap } from "@/lib/gsap";
 import { AiOrb, ORB } from "@/components/home/AiOrb";
+import { smallViewportHeight } from "@/lib/viewport";
 
 /**
  * Tempi in svh di scroll. LEAD: la sezione sale sopra gli ultimi 100svh di "Platform" (margine negativo), invisibile:
@@ -67,7 +68,8 @@ export function AiStage() {
         const azure = "#5aa9f0";
         const faint = "rgba(14,14,13,0.14)";
         const w = sticky.clientWidth;
-        const h = sticky.clientHeight;
+        // Le pose si misurano sullo schermo a barre aperte: il palco è più alto solo per coprire il fondo.
+        const h = smallViewportHeight();
         const desktop = w >= 1024;
 
         const root = gsap.timeline({
@@ -91,7 +93,17 @@ export function AiStage() {
         tl.to(all("[data-ai-eyebrow], [data-ai-mission]"), { autoAlpha: 0, y: -14, duration: 12, ease: "power2.in" }, 74);
 
         // Passi: la sfera si sposta a destra (sopra su schermi stretti), il testo a sinistra come in Platform.
-        const stepPose = desktop ? { x: w * 0.2, y: h * 0.02, scale: 0.86 } : { x: 0, y: -h * 0.17, scale: 0.6 };
+        // Su mobile la scala è limitata dalla larghezza: card e pillole più sporgenti restano dentro lo schermo.
+        const reach = field
+          ? Math.max(
+              ...all("[data-ai-act], [data-ai-src], [data-ai-co]", field).map(
+                (el) => Math.abs((el.parentElement?.offsetLeft ?? 0) - field.offsetWidth / 2) + el.offsetWidth / 2,
+              ),
+            )
+          : 0;
+        const stepPose = desktop
+          ? { x: w * 0.2, y: h * 0.02, scale: 0.86 }
+          : { x: 0, y: -h * 0.08, scale: Math.min(0.88, (w / 2 - 10) / (reach || 1)) };
         tl.fromTo(field, { x: 0, y: 0, scale: 1 }, { ...stepPose, duration: 34, ease: "power3.inOut" }, 86);
         tl.to(orb, { scale: 1, duration: 34, ease: "power3.inOut" }, 86);
         tl.fromTo(all("[data-ai-tag], [data-ai-pager]"), { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 12, ease: "power2.out" }, 98);
@@ -162,7 +174,15 @@ export function AiStage() {
 
         // Perché noi: il sistema intero si raccoglie in alto, sotto arriva la tesi del gruppo.
         tl.to(all("[data-ai-tag], [data-ai-pager]"), { autoAlpha: 0, y: -14, duration: 12, ease: "power2.in" }, 362);
-        const endPose = desktop ? { x: 0, y: -h * 0.15, scale: 0.6 } : { x: 0, y: -h * 0.22, scale: 0.42 };
+        // Su mobile la tesi cambia altezza con lo schermo: il sistema si raccoglie nello spazio libero tra header e titolo.
+        let endPose = { x: 0, y: -h * 0.15, scale: 0.6 };
+        const advTitle = one("[data-ai-adv-title]");
+        if (!desktop && field && advTitle) {
+          const header = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 72;
+          const top = header + 4;
+          const bottom = advTitle.getBoundingClientRect().top - sticky.getBoundingClientRect().top - 18;
+          endPose = { x: 0, y: (top + bottom) / 2 - h / 2, scale: Math.min(0.5, (bottom - top) / field.offsetWidth) };
+        }
         tl.to(field, { ...endPose, duration: 38, ease: "power3.inOut" }, 372);
         tl.fromTo(all("[data-ai-adv-title] .gs-line"), { yPercent: 110 }, { yPercent: 0, duration: 18, stagger: 5, ease: "power3.out" }, 398);
         tl.fromTo(all("[data-ai-adv-meta]"), { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 14, stagger: 5, ease: "power2.out" }, 408);
@@ -183,17 +203,18 @@ export function AiStage() {
   return (
     <section
       ref={stageRef}
-      className="relative -mt-[100svh] h-[660svh] motion-reduce:mt-0 motion-reduce:h-auto motion-reduce:bg-bg"
+      className="relative -mt-[100lvh] h-[660svh] motion-reduce:mt-0 motion-reduce:h-auto motion-reduce:bg-bg"
     >
+      {/* Palco alto 100lvh: copre lo schermo anche a barre del browser chiuse; sfera e testi restano in 100svh. */}
       <div
         data-ai-sticky
-        className="invisible sticky top-0 h-svh overflow-hidden bg-bg motion-reduce:visible motion-reduce:relative motion-reduce:h-auto motion-reduce:min-h-svh"
+        className="invisible sticky top-0 h-lvh overflow-hidden bg-bg motion-reduce:visible motion-reduce:relative motion-reduce:h-auto motion-reduce:min-h-svh"
       >
         {/* Campo della sfera: centrato nel palco, come la sfera di Platform. Linee in % del lato. */}
         <div
           data-ai-field
           aria-hidden
-          className="absolute top-1/2 left-1/2 motion-reduce:hidden"
+          className="absolute top-[50svh] left-1/2 motion-reduce:hidden"
           style={{
             width: `calc(${ORB} * ${FIELD})`,
             height: `calc(${ORB} * ${FIELD})`,
@@ -258,7 +279,7 @@ export function AiStage() {
             <span key={source} className="absolute -translate-x-1/2 -translate-y-1/2" style={at(R_SRC, SRC_ANGLES[i])}>
               <span
                 data-ai-src
-                className="invisible flex items-center gap-2 rounded-full border border-line-strong bg-bg-elevated px-3.5 py-2 font-mono text-[12px] tracking-[0.08em] whitespace-nowrap uppercase opacity-0"
+                className="invisible flex items-center gap-1.5 rounded-full border border-line-strong bg-bg-elevated px-2.5 py-[5px] font-mono text-[10.5px] leading-none tracking-[0.08em] whitespace-nowrap uppercase opacity-0 lg:gap-2 lg:px-3.5 lg:py-2 lg:text-[12px] lg:leading-normal"
               >
                 <span className="size-1.5 rounded-full bg-[#5aa9f0]" />
                 {source}
@@ -271,7 +292,7 @@ export function AiStage() {
             <span key={company} className="absolute -translate-x-1/2 -translate-y-1/2" style={at(R_CO, CO_ANGLES[i])}>
               <span
                 data-ai-co
-                className="invisible block rounded-full bg-ink-bg px-4 py-2 font-mono text-[12px] tracking-[0.08em] whitespace-nowrap text-ink-text uppercase opacity-0"
+                className="invisible block rounded-full bg-ink-bg px-3 py-[5px] font-mono text-[10.5px] leading-none tracking-[0.08em] whitespace-nowrap text-ink-text uppercase opacity-0 lg:px-4 lg:py-2 lg:text-[12px] lg:leading-normal"
               >
                 {company}
               </span>
@@ -293,20 +314,20 @@ export function AiStage() {
             <span key={action.tag} className="absolute -translate-x-1/2 -translate-y-1/2" style={at(R_ACT, ACT_ANGLES[i])}>
               <span
                 data-ai-act
-                className="invisible block w-[250px] rounded-xl border border-line bg-bg-elevated/85 p-4 opacity-0 shadow-[0_18px_40px_-24px_rgba(40,90,150,0.45)] backdrop-blur-md"
+                className="invisible block w-[160px] rounded-xl border border-line bg-bg-elevated/85 p-3 opacity-0 shadow-[0_18px_40px_-24px_rgba(40,90,150,0.45)] backdrop-blur-md lg:w-[250px] lg:p-4"
               >
                 <span className="flex items-center gap-2 font-mono text-[11px] tracking-[0.1em] text-muted uppercase">
                   <span className="size-1.5 rounded-full bg-[#5aa9f0] shadow-[0_0_8px_2px_rgba(90,169,240,0.5)]" />
                   AI · {action.tag}
                 </span>
-                <span className="mt-2 block text-[15px] leading-snug text-text">{action.text}</span>
+                <span className="mt-2 block text-[13px] leading-snug text-text lg:text-[15px]">{action.text}</span>
               </span>
             </span>
           ))}
         </div>
 
         {/* Missione: sopra la sfera, al centro. */}
-        <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center px-6 text-center motion-reduce:static motion-reduce:pt-32">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-svh flex-col items-center justify-center px-6 text-center motion-reduce:static motion-reduce:h-auto motion-reduce:pt-32">
           <p data-ai-eyebrow className="font-mono text-[13px] text-muted">
             06 — Intelligence
           </p>
@@ -318,14 +339,14 @@ export function AiStage() {
             ))}
           </h2>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-[8svh] z-30 px-6 motion-reduce:static motion-reduce:mt-10">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(8svh+100lvh-100svh)] z-30 px-6 motion-reduce:static motion-reduce:mt-10">
           <p data-ai-mission className="mx-auto max-w-xl text-center text-[17px] text-muted">
             {intelligence.mission}
           </p>
         </div>
 
         {/* Passi: in alto l'etichetta della sezione, in basso a sinistra contatore e testo, come in Platform. */}
-        <Container className="flex h-full flex-col pt-[calc(var(--header-h)+4svh)] pb-[7svh] motion-reduce:h-auto motion-reduce:py-24">
+        <Container className="flex h-svh flex-col pt-[calc(var(--header-h)+4svh)] pb-[7svh] motion-reduce:h-auto motion-reduce:py-24">
           <p data-ai-tag className="font-mono text-[13px] text-muted">
             06 — Intelligence
           </p>
@@ -368,28 +389,29 @@ export function AiStage() {
         </Container>
 
         {/* Perché noi: la tesi del gruppo sotto il sistema raccolto in alto. */}
-        <div className="absolute inset-x-0 bottom-[7svh] z-30 motion-reduce:static">
-          <Container className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-end lg:gap-10">
+        <div className="absolute inset-x-0 bottom-[calc(7svh+100lvh-100svh)] z-30 motion-reduce:static">
+          {/* Su mobile più compatta: sopra deve restare spazio per il sistema raccolto. */}
+          <Container className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-end lg:gap-10">
             <div>
-              <h2 data-ai-adv-title className="display text-[clamp(34px,4vw,64px)] leading-[0.98]">
+              <h2 data-ai-adv-title className="display text-[clamp(32px,4vw,64px)] leading-[0.98]">
                 {advantage.title.map((line) => (
                   <span key={line} className="block">
                     {line}
                   </span>
                 ))}
               </h2>
-              <p data-ai-adv-meta className="mt-5 max-w-md text-[16px] text-muted">
+              <p data-ai-adv-meta className="mt-3 max-w-md text-[15px] text-muted lg:mt-5 lg:text-[16px]">
                 {advantage.body}
               </p>
             </div>
-            <ul className="grid gap-6 sm:grid-cols-3 sm:gap-8">
+            <ul className="grid gap-4 sm:grid-cols-3 sm:gap-8">
               {advantage.points.map((point) => (
-                <li key={point.label} data-ai-adv-meta className="border-t border-line-strong pt-4">
+                <li key={point.label} data-ai-adv-meta className="border-t border-line-strong pt-3 lg:pt-4">
                   <p className="flex items-center gap-2 font-mono text-[12px] tracking-[0.08em] uppercase">
                     <span className="size-1.5 rounded-full bg-[#5aa9f0]" />
                     {point.label}
                   </p>
-                  <p className="mt-3 text-[15px] leading-snug text-muted">{point.text}</p>
+                  <p className="mt-2 text-[14px] leading-snug text-muted lg:mt-3 lg:text-[15px]">{point.text}</p>
                 </li>
               ))}
             </ul>

@@ -80,6 +80,7 @@ export function GroupStage() {
     let disposed = false;
     let scene: ServicesScene | null = null;
     let sceneState = 0;
+    let band: [number, number] | null = null;
     let observer: IntersectionObserver | null = null;
 
     import("@/components/graphics/services-scene").then(async ({ createServicesScene }) => {
@@ -91,6 +92,7 @@ export function GroupStage() {
       }
       scene = created;
       created.setState(sceneState);
+      if (band) created.setBand(...band);
       engineDrop.source = created;
       observer = new IntersectionObserver(([entry]) => created.setActive(entry.isIntersecting));
       observer.observe(stage);
@@ -111,6 +113,15 @@ export function GroupStage() {
           meta: all(el, "[data-point-num], [data-point-body]"),
         }));
         const bars = all(stage, "[data-bar]");
+
+        // Spazio libero tra titolo e tappe del motore: su schermi stretti la scena si centra e si adatta lì.
+        const box = sceneBox.getBoundingClientRect();
+        const engineTitle = stage.querySelector("[data-engine-title]")?.getBoundingClientRect();
+        const stepList = stage.querySelector("[data-step]")?.parentElement?.getBoundingClientRect();
+        if (engineTitle && stepList) {
+          band = [engineTitle.bottom - box.top, stepList.top - box.top];
+          scene?.setBand(...band);
+        }
 
         // Le posizioni sono in svh di scroll: 0 = palco che entra dal fondo, STAGE = fine.
         const tl = gsap.timeline({
@@ -249,7 +260,8 @@ export function GroupStage() {
 
   return (
     <section ref={stageRef} className="relative h-[700svh] motion-reduce:h-auto">
-      <div className="sticky top-0 h-svh overflow-hidden bg-bg motion-reduce:static motion-reduce:h-auto motion-reduce:overflow-visible">
+      {/* Palco alto 100lvh: il pannello scuro copre lo schermo anche a barre del browser chiuse; i testi restano in 100svh. */}
+      <div className="sticky top-0 h-lvh overflow-hidden bg-bg motion-reduce:static motion-reduce:h-auto motion-reduce:overflow-visible">
         <Container className="relative z-10 pt-[12svh] motion-reduce:py-24">
           <div data-manifesto-eyebrow>
             <Eyebrow index="01" label="The group" />
@@ -267,7 +279,7 @@ export function GroupStage() {
           className="absolute inset-0 z-20 bg-ink-bg text-ink-text [clip-path:inset(50%)] motion-reduce:relative motion-reduce:[clip-path:none]"
         >
           <div ref={sceneRef} aria-hidden className="absolute inset-0 motion-reduce:hidden" />
-          <Container className="relative flex h-full flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:py-24">
+          <Container className="relative flex h-svh flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:h-full motion-reduce:py-24">
             <div data-toprow className="flex items-center justify-between font-mono text-[13px] text-ink-text/60">
               <p>02 — What we&apos;ve learned</p>
               <div className="flex gap-2" aria-hidden>
@@ -296,7 +308,7 @@ export function GroupStage() {
           </Container>
 
           <div className="pointer-events-none absolute inset-0 text-[var(--text)] motion-reduce:relative motion-reduce:inset-auto motion-reduce:bg-bg">
-            <Container className="flex h-full flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:py-24">
+            <Container className="flex h-svh flex-col pt-[calc(var(--header-h)+4svh)] pb-[9svh] motion-reduce:h-full motion-reduce:py-24">
               <p data-engine-eyebrow className="font-mono text-[13px] text-muted">
                 03 — Our model
               </p>
@@ -308,9 +320,9 @@ export function GroupStage() {
                 ))}
               </h2>
               <div className="mt-auto max-w-md motion-reduce:mt-12">
-                <ol className="space-y-3">
+                <ol className="space-y-3 short:space-y-1.5">
                   {model.cycle.map((step, index) => (
-                    <li key={step.title} data-step className="flex gap-4 text-[clamp(18px,1.6vw,22px)] leading-snug">
+                    <li key={step.title} data-step className="flex gap-4 text-[clamp(18px,1.6vw,22px)] leading-snug short:text-[16px]">
                       <span data-step-num className="pt-1 font-mono text-[13px] text-faint motion-reduce:text-[var(--text)]">
                         0{index + 1}
                       </span>
@@ -320,18 +332,18 @@ export function GroupStage() {
                     </li>
                   ))}
                 </ol>
-                <div className="mt-8 grid motion-reduce:gap-4">
+                <div className="mt-8 grid short:mt-4 motion-reduce:gap-4">
                   {model.cycle.map((step) => (
                     <p
                       key={step.title}
                       data-step-body
-                      className="text-[17px] text-muted [grid-area:1/1] motion-reduce:[grid-area:auto]"
+                      className="text-[17px] text-muted [grid-area:1/1] short:text-[15px] motion-reduce:[grid-area:auto]"
                     >
                       {step.body}
                     </p>
                   ))}
                 </div>
-                <p data-engine-loop className="mt-8 font-mono text-[13px]">
+                <p data-engine-loop className="mt-8 font-mono text-[13px] short:mt-4">
                   {model.loop}
                 </p>
               </div>
