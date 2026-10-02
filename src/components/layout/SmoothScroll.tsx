@@ -8,12 +8,26 @@ import { gsap, registerGsap, ScrollTrigger } from "@/lib/gsap";
 /**
  * Smooth scroll con Lenis, agganciato al ticker di GSAP.
  * Con prefers-reduced-motion non parte: resta lo scroll nativo.
+ *
+ * ScrollTrigger va rinfrescato quando cambiano le misure (font, immagini, toolbar
+ * mobile): altrimenti le timeline scrub restano sullo stato sbagliato e i testi
+ * sembrano spariti o mai partiti.
  */
 export function SmoothScroll({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
     registerGsap();
+
+    // Al refresh del browser non ripartire a metà di una sezione pin/scrub.
+    if ("scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+
+    // Su mobile la barra URL che si apre/chiude non deve rifare refresh continui:
+    // spezzano le timeline e lasciano elementi a opacity/yPercent intermedi.
+    ScrollTrigger.config({ ignoreMobileResize: true });
+
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) return;
 
@@ -33,6 +47,24 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
     gsap.ticker.add(onTick);
     gsap.ticker.lagSmoothing(0);
 
+    const refresh = () => ScrollTrigger.refresh();
+
+    // Due frame: i componenti home montano i trigger nello stesso tick di Lenis.
+    let boot = 0;
+    boot = window.requestAnimationFrame(() => {
+      boot = window.requestAnimationFrame(refresh);
+    });
+
+    void document.fonts?.ready.then(refresh);
+    window.addEventListener("load", refresh);
+
+    let resizeTimer = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(refresh, 150);
+    };
+    window.addEventListener("resize", onResize);
+
     const onLock = (event: Event) => {
       const locked = (event as CustomEvent<boolean>).detail;
       if (locked) lenis.stop();
@@ -41,6 +73,10 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
     window.addEventListener("mindlead:lock-scroll", onLock);
 
     return () => {
+      window.cancelAnimationFrame(boot);
+      window.clearTimeout(resizeTimer);
+      window.removeEventListener("load", refresh);
+      window.removeEventListener("resize", onResize);
       window.removeEventListener("mindlead:lock-scroll", onLock);
       gsap.ticker.remove(onTick);
       lenis.destroy();
